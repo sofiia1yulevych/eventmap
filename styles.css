@@ -1,15 +1,12 @@
 #map {
-    height: 600px;
+    height: 100%;
     width: 70%;
     margin: auto;
+    flex: 2;
 }
 #container {
     display: flex;
     height: 100vh;
-}
-
-#map {
-    flex: 2;
 }
 
 #event-list {
@@ -18,4 +15,9 @@
     overflow-y: auto;
     background: #f8f8f8;
     border-left: 2px solid #ddd;
+}
+.divider {
+    height: 1px;
+    background: #ddd;
+    margin: 15px 0;
 }
