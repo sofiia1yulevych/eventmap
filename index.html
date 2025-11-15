@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Places Map</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+    <style>
+        #map {
+            height: 600px;
+            width: 70%;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Eventmap</h2>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // Karte initialisieren
+    const map = L.map('map').setView([50.775, 6.083], 14);
+
+    // OSM Layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    // 1. Daten aus PHP laden
+    fetch("get_places.php")
+        .then(response => response.json())
+        .then(places => {
+            places.forEach(place => {
+                // Marker setzen
+                L.marker([place.latitude, place.longitude])
+                    .addTo(map)
+                    .bindPopup(
+                        `<b>${place.name}</b><br>${place.description ?? ''}`
+                    );
+            });
+        });
+</script>
+
+
+</body>
+</html>
