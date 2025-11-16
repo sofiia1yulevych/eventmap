@@ -1,28 +1,344 @@
-fetch("get_events.php")
-    .then(res => res.json())
-    .then(events => {
-        console.log("Events:", events);
-        const list = document.getElementById("event-list");
+// Globale Variablen
+let map;
+let markerLayer;
+let allEvents = [];
+let currentFilters = {
+    date: 'all',
+    category: 'all',
+    search: ''
+};
 
-        events.forEach(ev => {
-            const div = document.createElement("div");
-            div.className = "event";
+// Karte initialisieren
+function initMap() {
+    map = L.map('map').setView([50.775, 6.083], 14);
 
-            console.log("Vor innerHTML - div:", div); // Debug 1
+    // OSM Layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
 
-            div.innerHTML = `
-              <div class="event-header">
-                <h3>${ev.name}</h3>
-              </div>
-              <p>${ev.description || ""}</p>
-              <p>Text</p>
-              <p><b>Von:</b> ${ev.start_date}</p>
-              <p><b>Bis:</b> ${ev.end_date}</p>
-            `;
+    // Marker Layer Group
+    markerLayer = L.layerGroup().addTo(map);
+}
 
-            console.log("Nach innerHTML - div content:", div.innerHTML); // Debug 2
-            console.log("Event-Header div:", div.querySelector('.event-header')); // Debug 3
-
-            list.appendChild(div);
-        });
+// Funktion zur Erstellung farbiger Icons
+function createColoredIcon(color) {
+    return new L.Icon({
+        iconUrl: `data:image/svg+xml;base64,${btoa(`
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+                <circle cx="16" cy="16" r="14" fill="${color}" stroke="#fff" stroke-width="2"/>
+                <circle cx="16" cy="12" r="4" fill="#fff"/>
+                <path d="M16 20 L10 28 L22 28 Z" fill="#fff"/>
+            </svg>
+        `)}`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -16]
     });
+}
+
+// Mapping von category_id zu Kategoriename und Farbe (Fallback falls DB nicht korrekt joined)
+const categoryMap = {
+    1: { name: 'Sport', color: '#dc2626' },
+    2: { name: 'Kunst', color: '#7c3aed' },
+    3: { name: 'Musik', color: '#059669' },
+    4: { name: 'Essen & Trinken', color: '#ea580c' },
+    5: { name: 'Bildung', color: '#2563eb' },
+    6: { name: 'Kultur', color: '#9333ea' },
+    7: { name: 'Festival', color: '#f59e0b' },
+    8: { name: 'Weihnachten', color: '#16a34a' },
+    9: { name: 'Familie', color: '#ec4899' },
+    10: { name: 'Andere', color: '#6b7280' }
+};
+
+// Hilfsfunktion zur Kategorie-Bestimmung
+function getCategoryInfo(event) {
+    // Zuerst versuchen, aus der DB geladene Daten zu verwenden
+    if (event.category_name && event.category_color) {
+        return {
+            name: event.category_name,
+            color: event.category_color
+        };
+    }
+
+    // Fallback: Aus category_id mappen
+    const categoryId = event.category_id;
+    return categoryMap[categoryId] || { name: 'Andere', color: '#6b7280' };
+}
+
+// Events laden
+function loadEvents() {
+    fetch("get_events.php")
+        .then(res => res.json())
+        .then(events => {
+            console.log("Geladene Events:", events); // Debug-Ausgabe
+            allEvents = events;
+            applyFilters();
+        })
+        .catch(error => console.error('Fehler beim Laden der Events:', error));
+}
+
+// Filter anwenden
+function applyFilters() {
+    let filteredEvents = allEvents.filter(event => {
+        // Datumsfilter
+        if (!filterByDate(event, currentFilters.date)) return false;
+
+        // Kategoriefilter
+        if (!filterByCategory(event, currentFilters.category)) return false;
+
+        // Suchfilter
+        if (!filterBySearch(event, currentFilters.search)) return false;
+
+        return true;
+    });
+
+    displayEvents(filteredEvents);
+    addMarkersToMap(filteredEvents);
+    updateResultsCount(filteredEvents.length);
+}
+
+// Datumsfilter
+function filterByDate(event, filterType) {
+    if (filterType === 'all') return true;
+
+    const eventDate = new Date(event.start_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    switch(filterType) {
+        case 'today':
+            return eventDate.toDateString() === today.toDateString();
+        case 'tomorrow':
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return eventDate.toDateString() === tomorrow.toDateString();
+        case 'week':
+            const endOfWeek = new Date(today);
+            endOfWeek.setDate(endOfWeek.getDate() + 7);
+            return eventDate >= today && eventDate <= endOfWeek;
+        case 'month':
+            const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            return eventDate >= today && eventDate <= endOfMonth;
+        default:
+            return true;
+    }
+}
+
+// Kategoriefilter
+function filterByCategory(event, categoryId) {
+    if (categoryId === 'all') return true;
+    return event.category_id == categoryId;
+}
+
+// Suchfilter
+function filterBySearch(event, searchTerm) {
+    if (!searchTerm) return true;
+
+    const searchLower = searchTerm.toLowerCase();
+    const categoryInfo = getCategoryInfo(event);
+
+    return (
+        event.name.toLowerCase().includes(searchLower) ||
+        event.description.toLowerCase().includes(searchLower) ||
+        event.place_name.toLowerCase().includes(searchLower) ||
+        categoryInfo.name.toLowerCase().includes(searchLower)
+    );
+}
+
+// Events anzeigen
+function displayEvents(events) {
+    const container = document.getElementById('events-container');
+    if (!container) {
+        console.error('Container #events-container nicht gefunden!');
+        return;
+    }
+
+    container.innerHTML = '';
+
+    if (events.length === 0) {
+        container.innerHTML = '<div class="no-events">Keine Veranstaltungen gefunden.</div>';
+        return;
+    }
+
+    events.forEach(event => {
+        const div = document.createElement("div");
+        div.className = "event";
+
+        const startDate = formatDate(event.start_date);
+        const endDate = formatDate(event.end_date);
+        const categoryInfo = getCategoryInfo(event);
+
+        div.innerHTML = `
+            <div class="event-header">
+                <h3>${event.name}</h3>
+                <span class="category-badge" style="background-color: ${categoryInfo.color}">
+                    ${categoryInfo.name}
+                </span>
+            </div>
+            <p>${event.description || ""}</p>
+            <p><b>Ort:</b> ${event.place_name || ''}</p>
+            <p><b>Von:</b> ${startDate}</p>
+            <p><b>Bis:</b> ${endDate}</p>
+        `;
+
+        container.appendChild(div);
+    });
+}
+
+// Marker zur Karte hinzufügen
+function addMarkersToMap(events) {
+    markerLayer.clearLayers();
+
+    events.forEach(event => {
+        if (event.latitude && event.longitude) {
+            const categoryInfo = getCategoryInfo(event);
+            const icon = createColoredIcon(categoryInfo.color);
+
+            const marker = L.marker([event.latitude, event.longitude], { icon: icon })
+                .addTo(markerLayer)
+                .bindPopup(`
+                    <div class="popup-content">
+                        <b>${event.name}</b><br>
+                        <span class="popup-category" style="color: ${categoryInfo.color}">
+                            ${categoryInfo.name}
+                        </span><br>
+                        <small>${formatDate(event.start_date)}</small><br>
+                        ${event.description || ''}
+                    </div>
+                `);
+        }
+    });
+}
+
+// Datum formatieren
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// Ergebnisse-Zähler aktualisieren
+function updateResultsCount(count) {
+    const title = document.querySelector('#event-list h2');
+    if (title) {
+        title.textContent = `Veranstaltungen (${count})`;
+    }
+}
+
+// Event-Listener
+function initEventListeners() {
+    // Datumsfilter
+    const dateFilter = document.getElementById('date-filter');
+    if (dateFilter) {
+        dateFilter.addEventListener('change', function() {
+            currentFilters.date = this.value;
+            applyFilters();
+        });
+    }
+
+    // Kategoriefilter
+    const categoryFilter = document.getElementById('category-filter');
+    if (categoryFilter) {
+        categoryFilter.addEventListener('change', function() {
+            currentFilters.category = this.value;
+            applyFilters();
+        });
+    }
+
+    // Suchfunktion
+    const searchButton = document.getElementById('search-button');
+    const searchInput = document.getElementById('search-input');
+
+    if (searchButton && searchInput) {
+        searchButton.addEventListener('click', performSearch);
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') performSearch();
+        });
+    }
+
+    // Filter zurücksetzen
+    const resetButton = document.getElementById('reset-filters');
+    if (resetButton) {
+        resetButton.addEventListener('click', function() {
+            if (dateFilter) dateFilter.value = 'all';
+            if (categoryFilter) categoryFilter.value = 'all';
+            if (searchInput) searchInput.value = '';
+            currentFilters = { date: 'all', category: 'all', search: '' };
+            applyFilters();
+        });
+    }
+}
+
+// Suche ausführen
+function performSearch() {
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        const searchTerm = searchInput.value.trim();
+        currentFilters.search = searchTerm;
+        applyFilters();
+    }
+}
+
+// Initialisierung
+document.addEventListener('DOMContentLoaded', function() {
+    initMap();
+    initEventListeners();
+    loadEvents();
+});
+
+
+// Suchfilter - NUR nach Veranstaltungsnamen
+function filterBySearch(event, searchTerm) {
+    if (!searchTerm) return true;
+
+    const searchLower = searchTerm.toLowerCase();
+    return event.name.toLowerCase().includes(searchLower);
+}
+
+// Suchfunktion
+const searchButton = document.getElementById('search-button');
+const searchInput = document.getElementById('search-input');
+
+if (searchButton && searchInput) {
+    searchButton.addEventListener('click', performSearch);
+    searchInput.addEventListener('input', function() {
+        // Live-Suche bei jeder Eingabe
+        performSearch();
+    });
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') performSearch();
+    });
+}
+
+// Suche ausführen
+
+
+// Filter zurücksetzen
+const resetButton = document.getElementById('reset-filters');
+if (resetButton) {
+    resetButton.addEventListener('click', function() {
+        if (dateFilter) dateFilter.value = 'all';
+        if (categoryFilter) categoryFilter.value = 'all';
+        if (searchInput) searchInput.value = ''; // Suchfeld zurücksetzen
+
+        // Custom-Date-Container zurücksetzen
+        const customDateContainer = document.getElementById('custom-date-container');
+        if (customDateContainer) {
+            customDateContainer.style.display = 'none';
+        }
+        const startDate = document.getElementById('start-date');
+        const endDate = document.getElementById('end-date');
+        if (startDate) startDate.value = '';
+        if (endDate) endDate.value = '';
+
+        currentFilters = { date: 'all', category: 'all', search: '' };
+        applyFilters();
+    });
+}

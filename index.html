@@ -1,75 +1,82 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Places Map</title>
+    <title>EventMap Aachen</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="stylesheet" href="styles.css">
-
-    <!--<style>
-        #map {
-            height: 600px;
-            width: 70%;
-            margin: auto;
-        }
-    </style>-->
 </head>
 <body>
 
-<h1>Eventmap</h1>
+<h1>Eventmap Aachen</h1>
+<h2>Veranstaltungen</h2>
+<section id="filter">
+    <!-- Suchfeld -->
+    <div class="filter-controls">
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="Veranstaltung suchen...">
+            <button id="search-button" class="search-btn">🔍</button>
+        </div>
+    </div>
 
+    <!-- Datumsfilter -->
+    <div class="gruppe-filter">
+    <div id="filter-controls">
+        <select id="date-filter">
+            <option value="all">Alle Daten</option>
+            <option value="today">Heute</option>
+            <option value="tomorrow">Morgen</option>
+            <option value="week">Diese Woche</option>
+            <option value="next_week">Nächste Woche</option>
+            <option value="month">Diesen Monat</option>
+            <option value="next_month">Nächsten Monat</option>
+            <option value="custom">Benutzerdefiniert</option>
+        </select>
+        <div id="custom-date-container" style="display: none; margin-top: 10px;">
+            <label for="start-date">Von:</label>
+            <input type="date" id="start-date">
+            <label for="end-date" style="margin-left: 10px;">Bis:</label>
+            <input type="date" id="end-date">
+            <button id="apply-custom-date">Anwenden</button>
+        </div>
+    </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Kategoriefilter -->
+    <div class="filter-controls">
+        <select id="category-filter">
+            <option value="all">Alle Kategorien</option>
+            <option value="1">Sport</option>
+            <option value="2">Kunst</option>
+            <option value="3">Musik</option>
+            <option value="4">Essen & Trinken</option>
+            <option value="5">Bildung</option>
+            <option value="6">Kultur</option>
+            <option value="7">Festival</option>
+            <option value="8">Weihnachten</option>
+            <option value="9">Familie</option>
+            <option value="10">Andere</option>
+        </select>
+    </div>
+    </div>
+
+    <!-- Filter zurücksetzen -->
+    <button id="reset-filters">Filter zurücksetzen</button>
+</section>
+
 <div id="container">
     <div id="map"></div>
     <div id="event-list">
-        <h2>Veranstaltungen</h2>
+        <div id="events-container"></div>
     </div>
 </div>
-<script>
-    // Karte initialisieren
-    const map = L.map('map').setView([50.775, 6.083], 14);
 
-    // OSM Layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
+<footer>
+    <p style="margin: 30px; text-align: center">Impressum</p>
+</footer>
 
-    // 1. Daten aus PHP laden
-    fetch("get_events.php")
-        .then(response => response.json())
-        .then(places => {
-            places.forEach(place => {
-                // Marker setzen
-                L.marker([place.latitude, place.longitude])
-                    .addTo(map)
-                    .bindPopup(
-                        `<b>${place.name}</b><br>${place.description ?? ''}`
-                    );
-            });
-        });
-    fetch("get_events.php")
-        .then(res => res.json())
-        .then(events => {
-            const list = document.getElementById("event-list");
-
-            events.forEach(ev => {
-                const div = document.createElement("div");
-                div.className = "event";
-
-                div.innerHTML = `
-              <h3>${ev.name}</h3>
-              <p>${ev.description || ""}</p>
-              <p><b>Von:</b> ${ev.start_date}</p>
-              <p><b>Bis:</b> ${ev.end_date}</p>
-          `;
-
-                list.appendChild(div);
-            });
-        });
-</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="script.js"></script>
 
 
 </body>
