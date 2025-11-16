@@ -1,23 +1,63 @@
-#map {
-    height: 100%;
-    width: 70%;
-    margin: auto;
-    flex: 2;
+body{
+    margin: 0 10%;
+    background-color: rgba(254, 254, 227, 0.25);
+    font-family: "Helvetica Neue", "Arial", serif;
 }
 #container {
     display: flex;
-    height: 100vh;
+    height: 80vh;
+    gap: 10px;
 }
-
+h1{
+    color: #829481;
+}
+/*Karte*/
+#map {
+    height: 100%;
+    flex: 2;
+    border-radius: 20px;
+    border: 2px solid #829481;
+}
+/*Liste*/
 #event-list {
     flex: 1;
     padding: 15px;
     overflow-y: auto;
-    background: #f8f8f8;
-    border-left: 2px solid #ddd;
+    background: #bfd8bd;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    position: relative;
 }
-.divider {
-    height: 1px;
-    background: #ddd;
-    margin: 15px 0;
+
+#event-list::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    background: linear-gradient(to bottom,
+    transparent 0%,
+    rgba(15, 41, 14, 0.3) 150%
+    );
+    pointer-events: none; /* Damit Klicks durchgehen */
+    z-index: 1; /* Über den Inhalten */
+}
+#event-list h2{
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.event{
+    background-color: white;
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    box-shadow: 0 8px 6px -6px rgba(0, 0, 0, 0.3);
+}
+.event h3{
+    margin-top: 0;
+}
+.event p{
+    margin-bottom: 0;
 }
