@@ -342,3 +342,68 @@ if (resetButton) {
         applyFilters();
     });
 }
+
+
+// Marker zur Karte hinzufügen - ERWEITERT
+function addMarkersToMap(events) {
+    markerLayer.clearLayers();
+
+    events.forEach(event => {
+        if (event.latitude && event.longitude) {
+            const categoryInfo = getCategoryInfo(event);
+            const icon = createColoredIcon(categoryInfo.color);
+
+            const marker = L.marker([event.latitude, event.longitude], { icon: icon })
+                .addTo(markerLayer)
+                .bindPopup(`
+                    <div class="popup-content">
+                        <b>${event.name}</b><br>
+                        <span class="popup-category" style="color: ${categoryInfo.color}">
+                            ${categoryInfo.name}
+                        </span><br>
+                        <small>${formatDate(event.start_date)}</small><br>
+                        ${event.description || ''}
+                    </div>
+                `)
+                .on('click', function() {
+                    // Beim Klick auf Marker Event in der Liste hervorheben
+                    highlightEventInList(event.id);
+                });
+        }
+    });
+}
+
+// Event in der Liste hervorheben und scrollen
+function highlightEventInList(eventId) {
+    const eventsContainer = document.getElementById('events-container');
+    const eventElements = eventsContainer.getElementsByClassName('event');
+
+    // Alte Hervorhebungen entfernen
+    Array.from(eventElements).forEach(eventElement => {
+        eventElement.classList.remove('event-highlighted');
+        // Event-ID aus data-attribut entfernen falls vorhanden
+        eventElement.removeAttribute('data-event-id');
+    });
+
+    // Neues Event finden und hervorheben
+    Array.from(eventElements).forEach(eventElement => {
+        // Prüfen ob dieses Element das gesuchte Event ist
+        const eventName = eventElement.querySelector('h3')?.textContent;
+        const targetEvent = allEvents.find(e => e.id == eventId);
+
+        if (targetEvent && eventName === targetEvent.name) {
+            // Event-ID speichern
+            eventElement.setAttribute('data-event-id', eventId);
+            eventElement.classList.add('event-highlighted');
+
+            // Zum Event scrollen
+            eventElement.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+            setTimeout(() => {
+                eventElement.classList.remove('event-highlighted');
+            }, 3000);
+        }
+    });
+}
