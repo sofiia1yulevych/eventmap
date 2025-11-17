@@ -165,60 +165,92 @@ function displayEvents(events) {
     events.forEach(event => {
         const div = document.createElement("div");
         div.className = "event";
+        div.setAttribute('data-event-id', event.id);
 
-        const startDate = formatDate(event.start_date);
-        const endDate = formatDate(event.end_date);
+        const dateInfo = formatEventDate(event.start_date);
+        const startTime = formatTime(event.start_time);
+        const endTime = formatTime(event.end_time);
         const categoryInfo = getCategoryInfo(event);
+
+        // Bild-HTML falls vorhanden
+        const imageHtml = event.image ?
+            `<img src="${event.image}" alt="${event.name}" class="event-image" onerror="this.style.display='none'">` :
+            '';
+
+        // Zeit-Informationen
+        let timeInfo = '';
+        if (startTime && endTime) {
+            timeInfo = `<p class="event-time">🕑 ${startTime} - ${endTime} Uhr</p>`;
+        } else if (startTime) {
+            timeInfo = `<p class="event-time">🕑 ${startTime} Uhr</p>`;
+        }
 
         div.innerHTML = `
             <div class="event-header">
-                <h3>${event.name}</h3>
-                <span class="category-badge" style="background-color: ${categoryInfo.color}">
-                    ${categoryInfo.name}
-                </span>
+            <div class="date-title">
+                <div class="event-date">
+                    <div class="event-day">${dateInfo.day}</div>
+                    <div class="event-month">${dateInfo.month}</div>
+                </div>
+                <div>
+                <h3 class="event-title">${event.name}</h3>
+                <div class="event-category">
+                    <span class="category-badge" style="background-color: ${categoryInfo.color}">
+                        ${categoryInfo.name}
+                    </span>
+                </div>
+                </div>
+                </div>
+                  ${imageHtml}
+          
             </div>
-            <p>${event.description || ""}</p>
-            <p><b>Ort:</b> ${event.place_name || ''}</p>
-            <p><b>Von:</b> ${startDate}</p>
-            <p><b>Bis:</b> ${endDate}</p>
+            <div class="event-body">
+              
+                <div class="event-details">
+                    <p class="event-description">${event.description || ""}</p>
+                    <div class="event-meta">
+                        <p class="event-location">📍 ${event.place_name || ''}</p>
+                        ${timeInfo}
+                    </div>
+                </div>
+            </div>
         `;
+
+        // Klick-Event für Event in der Liste
+        div.addEventListener('click', function() {
+            highlightEventInList(event.id);
+            highlightMarkerOnMap(event.id);
+        });
 
         container.appendChild(div);
     });
 }
 
-// Marker zur Karte hinzufügen
-function addMarkersToMap(events) {
-    markerLayer.clearLayers();
-
-    events.forEach(event => {
-        if (event.latitude && event.longitude) {
-            const categoryInfo = getCategoryInfo(event);
-            const icon = createColoredIcon(categoryInfo.color);
-
-            const marker = L.marker([event.latitude, event.longitude], { icon: icon })
-                .addTo(markerLayer)
-                .bindPopup(`
-                    <div class="popup-content">
-                        <b>${event.name}</b><br>
-                        <span class="popup-category" style="color: ${categoryInfo.color}">
-                            ${categoryInfo.name}
-                        </span><br>
-                        <small>${formatDate(event.start_date)}</small><br>
-                        ${event.description || ''}
-                    </div>
-                `);
-        }
-    });
+// Neue Hilfsfunktion für Datumsformatierung
+function formatEventDate(dateString) {
+    const date = new Date(dateString);
+    return {
+        day: date.getDate().toString(),
+        month: date.toLocaleDateString('de-DE', { month: 'short' })
+    };
 }
 
+
 // Datum formatieren
+// Nur Datum formatieren (ohne Zeit)
 function formatDate(dateString) {
     const date = new Date(dateString);
     return date.toLocaleDateString('de-DE', {
         day: '2-digit',
         month: '2-digit',
-        year: 'numeric',
+        year: 'numeric'
+    });
+}
+function formatTime(timeString) {
+    if (!timeString) return '';
+    // TIME-Format (HH:MM:SS) zu lesbarer Zeit konvertieren
+    const time = new Date(`2000-01-01T${timeString}`);
+    return time.toLocaleTimeString('de-DE', {
         hour: '2-digit',
         minute: '2-digit'
     });
