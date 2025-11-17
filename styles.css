@@ -111,12 +111,12 @@ h1{
 
 /* Reset-Button */
 #reset-filters {
-    width: 100%;
-    padding: 14px 20px;
+    width: 15%;
+    padding: 8px;
     background: linear-gradient(135deg, #829481, #6d7a6d);
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 5px;
     font-size: 16px;
     font-weight: bold;
     cursor: pointer;
