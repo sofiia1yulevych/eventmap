@@ -174,7 +174,9 @@ function displayEvents(events) {
 
         // Bild-HTML falls vorhanden
         const imageHtml = event.image ?
-            `<img src="${event.image}" alt="${event.name}" class="event-image" onerror="this.style.display='none'">` :
+            `<div class="image-container">
+        <img src="${event.image}" alt="${event.name}" onerror="this.style.display='none'">
+     </div>` :
             '';
 
         // Zeit-Informationen
@@ -189,30 +191,30 @@ function displayEvents(events) {
             <div class="event-header">
             <div class="date-title">
                 <div class="event-date">
-                    <div class="event-day">${dateInfo.day}</div>
+                    <div class="event-day">${dateInfo.day}.</div>
                     <div class="event-month">${dateInfo.month}</div>
                 </div>
-                <div>
+                <div class="title-category">
                 <h3 class="event-title">${event.name}</h3>
                 <div class="event-category">
-                    <span class="category-badge" style="background-color: ${categoryInfo.color}">
+                    <span class="category-badge" style="background-color: ${categoryInfo.color}; padding: 0 3px; border-radius: 2px;">
                         ${categoryInfo.name}
                     </span>
+                </div>
+                 <div class="event-details">
+                    <p class="event-description">${event.description || ""}</p>
+                    <div class="event-meta">
+                        <p class="event-location">📍 ${event.place_name || ''}</p>
+                        <p>${timeInfo}</p>
+                    </div>
+
                 </div>
                 </div>
                 </div>
                   ${imageHtml}
           
             </div>
-            <div class="event-body">
-              
-                <div class="event-details">
-                    <p class="event-description">${event.description || ""}</p>
-                    <div class="event-meta">
-                        <p class="event-location">📍 ${event.place_name || ''}</p>
-                        ${timeInfo}
-                    </div>
-                </div>
+
             </div>
         `;
 
