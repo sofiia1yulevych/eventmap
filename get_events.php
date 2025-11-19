@@ -10,14 +10,13 @@ $password = 'EventMap2024!Secure';
 $port = 4025;
 
 try {
-    // DIESE ZEILE GEÄNDERT - SSL Optionen hinzugefügt
     $pdo = new PDO("mysql:host=$host;port=$port;dbname=$dbname;charset=utf8", $username, $password, [
         PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
         PDO::MYSQL_ATTR_SSL_KEY => false,
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
     ]);
 
-    // Events mit Kategorien, Farben, Zeiten und Bildern holen
+    // GEÄNDERT: categories.image mit auswählen
     $stmt = $pdo->query("
         SELECT 
             events.*, 
@@ -25,7 +24,8 @@ try {
             places.longitude, 
             places.name AS place_name,
             categories.name AS category_name,
-            categories.color AS category_color
+            categories.color AS category_color,
+            categories.image AS category_image  -- NEU: Bild aus categories-Tabelle
         FROM events
         JOIN places ON events.place_id = places.id
         LEFT JOIN categories ON events.category_id = categories.id
@@ -35,7 +35,8 @@ try {
 
     $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Bild-Pfade für Events hinzufügen
+    // ALT: Event-Bilder - KANN ENTFERNT WERDEN, da wir jetzt Kategorie-Bilder verwenden
+    /*
     foreach ($events as &$event) {
         $imagePath = 'images/events/' . $event['id'] . '.jpg';
         if (file_exists($imagePath)) {
@@ -44,6 +45,7 @@ try {
             $event['image_url'] = null;
         }
     }
+    */
 
     echo json_encode($events);
 

@@ -148,6 +148,7 @@ function filterBySearch(event, searchTerm) {
 }
 
 // Events anzeigen
+// Events anzeigen - ANGEPASST für Kategorie-Bilder
 function displayEvents(events) {
     const container = document.getElementById('events-container');
     if (!container) {
@@ -172,11 +173,11 @@ function displayEvents(events) {
         const endTime = formatTime(event.end_time);
         const categoryInfo = getCategoryInfo(event);
 
-        // Bild-HTML falls vorhanden
-        const imageHtml = event.image ?
+        // NEU: Kategorie-Bild statt Event-Bild verwenden
+        const imageHtml = event.category_image ?
             `<div class="image-container">
-        <img src="${event.image}" alt="${event.name}" onerror="this.style.display='none'">
-     </div>` :
+                <img src="${event.category_image}" alt="${categoryInfo.name}" onerror="this.style.display='none'">
+            </div>` :
             '';
 
         // Zeit-Informationen
@@ -189,32 +190,28 @@ function displayEvents(events) {
 
         div.innerHTML = `
             <div class="event-header">
-            <div class="date-title">
-                <div class="event-date">
-                    <div class="event-day">${dateInfo.day}.</div>
-                    <div class="event-month">${dateInfo.month}</div>
-                </div>
-                <div class="title-category">
-                <h3 class="event-title">${event.name}</h3>
-                <div class="event-category">
-                    <span class="category-badge" style="background-color: ${categoryInfo.color}; padding: 0 3px; border-radius: 2px;">
-                        ${categoryInfo.name}
-                    </span>
-                </div>
-                 <div class="event-details">
-                    <p class="event-description">${event.description || ""}</p>
-                    <div class="event-meta">
-                        <p class="event-location">📍 ${event.place_name || ''}</p>
-                        <p>${timeInfo}</p>
+                <div class="date-title">
+                    <div class="event-date">
+                        <div class="event-day">${dateInfo.day}.</div>
+                        <div class="event-month">${dateInfo.month}</div>
                     </div>
-
+                    <div class="title-category">
+                        <h3 class="event-title">${event.name}</h3>
+                        <div class="event-category">
+                            <span class="category-badge" style="background-color: ${categoryInfo.color}; padding: 0 3px; border-radius: 2px;">
+                                ${categoryInfo.name}
+                            </span>
+                        </div>
+                        <div class="event-details">
+                            <p class="event-description">${event.description || ""}</p>
+                            <div class="event-meta">
+                                <p class="event-location">📍 ${event.place_name || ''}</p>
+                                <p>${timeInfo}</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                </div>
-                </div>
-                  ${imageHtml}
-          
-            </div>
-
+                ${imageHtml}
             </div>
         `;
 
