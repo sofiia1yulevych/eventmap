@@ -7,6 +7,8 @@ let currentFilters = {
     category: 'all',
     search: ''
 };
+let eventMarkers = {};
+let locationGroups = {}; // NEU: Gruppiert Events nach Standort
 
 // Karte initialisieren
 function initMap() {
@@ -23,11 +25,14 @@ function initMap() {
 }
 
 // Funktion zur Erstellung farbiger Icons
-function createColoredIcon(color) {
+function createColoredIcon(color, highlighted = false) {
+    const strokeWidth = highlighted ? 3 : 2;
+    const strokeColor = highlighted ? '#000' : '#fff';
+
     return new L.Icon({
         iconUrl: `data:image/svg+xml;base64,${btoa(`
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-                <circle cx="16" cy="16" r="14" fill="${color}" stroke="#fff" stroke-width="2"/>
+                <circle cx="16" cy="16" r="14" fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>
                 <circle cx="16" cy="12" r="4" fill="#fff"/>
                 <path d="M16 20 L10 28 L22 28 Z" fill="#fff"/>
             </svg>
@@ -38,18 +43,38 @@ function createColoredIcon(color) {
     });
 }
 
-// Mapping von category_id zu Kategoriename und Farbe (Fallback falls DB nicht korrekt joined)
+// NEU: Funktion zur Berechnung versetzter Positionen
+function calculateOffsetPosition(lat, lng, index, total) {
+    // Basis-Offset in Grad (etwa 10-20 Meter)
+    const baseOffset = 0.0002;
+
+    // Wenn nur ein Event, keine Versetzung
+    if (total <= 1) {
+        return { lat: lat, lng: lng };
+    }
+
+    // Verteile Marker im Kreis um die ursprüngliche Position
+    const angle = (index * (2 * Math.PI)) / total;
+    const radius = baseOffset * Math.min(total / 3, 2); // Radius basierend auf Anzahl
+
+    const offsetLat = lat + (radius * Math.cos(angle));
+    const offsetLng = lng + (radius * Math.sin(angle));
+
+    return { lat: offsetLat, lng: offsetLng };
+}
+
+// Mapping von category_id zu Kategoriename, Farbe und Bild
 const categoryMap = {
-    1: { name: 'Sport', color: '#dc2626' },
-    2: { name: 'Kunst', color: '#7c3aed' },
-    3: { name: 'Musik', color: '#059669' },
-    4: { name: 'Essen & Trinken', color: '#ea580c' },
-    5: { name: 'Bildung', color: '#2563eb' },
-    6: { name: 'Kultur', color: '#9333ea' },
-    7: { name: 'Festival', color: '#f59e0b' },
-    8: { name: 'Weihnachten', color: '#16a34a' },
-    9: { name: 'Familie', color: '#ec4899' },
-    10: { name: 'Andere', color: '#6b7280' }
+    1: { name: 'Sport', color: '#dc2626', image: '/images/Sport.jpg' },
+    2: { name: 'Kunst', color: '#7c3aed', image: '/images/Kunst.jpeg' },
+    3: { name: 'Musik', color: '#059669', image: '/images/Musik.jpg' },
+    4: { name: 'Essen & Trinken', color: '#ea580c', image: '/images/Markt.jpg' },
+    5: { name: 'Bildung', color: '#2563eb', image: '/images/Bildung.jpg' },
+    6: { name: 'Kultur', color: '#9333ea', image: '/images/Kultur.jpg' },
+    7: { name: 'Festival', color: '#f59e0b', image: '/images/Festival.jpg' },
+    8: { name: 'Weihnachten', color: '#bde0fe', image: '/images/Weihnachten.jpg' },
+    9: { name: 'Familie', color: '#ec4899', image: '/images/Familie.jpg' },
+    10: { name: 'Andere', color: '#6b7280', image: null }
 };
 
 // Hilfsfunktion zur Kategorie-Bestimmung
@@ -58,13 +83,14 @@ function getCategoryInfo(event) {
     if (event.category_name && event.category_color) {
         return {
             name: event.category_name,
-            color: event.category_color
+            color: event.category_color,
+            image: event.category_image
         };
     }
 
     // Fallback: Aus category_id mappen
     const categoryId = event.category_id;
-    return categoryMap[categoryId] || { name: 'Andere', color: '#6b7280' };
+    return categoryMap[categoryId] || { name: 'Andere', color: '#6b7280', image: null };
 }
 
 // Events laden
@@ -72,11 +98,166 @@ function loadEvents() {
     fetch("get_events.php")
         .then(res => res.json())
         .then(events => {
-            console.log("Geladene Events:", events); // Debug-Ausgabe
+            console.log("Geladene Events:", events);
             allEvents = events;
             applyFilters();
         })
         .catch(error => console.error('Fehler beim Laden der Events:', error));
+}
+
+// NEU: Verbesserte Marker-Funktion mit versetzten Positionen
+function addMarkersToMap(events) {
+    markerLayer.clearLayers();
+    eventMarkers = {};
+    locationGroups = {}; // Reset location groups
+
+    // Zuerst Events nach Standort gruppieren
+    events.forEach(event => {
+        if (event.latitude && event.longitude) {
+            const locationKey = `${event.latitude.toFixed(6)},${event.longitude.toFixed(6)}`;
+
+            if (!locationGroups[locationKey]) {
+                locationGroups[locationKey] = [];
+            }
+            locationGroups[locationKey].push(event);
+        }
+    });
+
+    // Dann Marker für jede Gruppe erstellen
+    Object.keys(locationGroups).forEach(locationKey => {
+        const eventsAtLocation = locationGroups[locationKey];
+        const baseLat = parseFloat(locationKey.split(',')[0]);
+        const baseLng = parseFloat(locationKey.split(',')[1]);
+
+        eventsAtLocation.forEach((event, index) => {
+            // Berechne versetzte Position für diesen Marker
+            const offsetPosition = calculateOffsetPosition(
+                baseLat,
+                baseLng,
+                index,
+                eventsAtLocation.length
+            );
+
+            const categoryInfo = getCategoryInfo(event);
+            const icon = createColoredIcon(categoryInfo.color);
+
+            const marker = L.marker([offsetPosition.lat, offsetPosition.lng], { icon: icon })
+                .addTo(markerLayer)
+                .bindPopup(`
+                    <div class="popup-content">
+                        <b>${event.name}</b><br>
+                        <span class="popup-category" style="color: ${categoryInfo.color}">
+                            ${categoryInfo.name}
+                        </span><br>
+                        <small>${formatDate(event.start_date)}</small><br>
+                        ${event.description || ''}
+                    </div>
+                `)
+                .on('click', function() {
+                    highlightEventInList(event.id);
+                    highlightEventOnMap(event.id);
+                });
+
+            // Marker in globaler Variable speichern
+            eventMarkers[event.id] = marker;
+        });
+    });
+}
+
+// NEU: Marker auf der Karte hervorheben und zentrieren
+function highlightEventOnMap(eventId) {
+    const marker = eventMarkers[eventId];
+    if (marker) {
+        // Karte zum Marker zentrieren
+        map.setView(marker.getLatLng(), 16);
+
+        // Popup öffnen
+        marker.openPopup();
+
+        // Marker vorübergehend hervorheben
+        const event = allEvents.find(e => e.id == eventId);
+        const categoryInfo = getCategoryInfo(event);
+        marker.setIcon(createColoredIcon(categoryInfo.color, true));
+
+        // Nach 3 Sekunden zurücksetzen
+        setTimeout(() => {
+            marker.setIcon(createColoredIcon(categoryInfo.color, false));
+        }, 3000);
+    }
+}
+
+// NEU: Hilfsfunktion für Wochenberechnung (Montag bis Sonntag)
+function getWeekRange(weekOffset = 0) {
+    const today = new Date();
+    const currentDay = today.getDay();
+
+    // Montag als Wochenstart (0 = Sonntag, 1 = Montag, ... 6 = Samstag)
+    const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
+
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() + mondayOffset + (weekOffset * 7));
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    return { start: startOfWeek, end: endOfWeek };
+}
+
+// NEU: Hilfsfunktion für Monatsberechnung
+function getMonthRange(monthOffset = 0) {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth() + monthOffset;
+
+    // Ersten Tag des Monats
+    const startOfMonth = new Date(year, month, 1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    // Letzten Tag des Monats
+    const endOfMonth = new Date(year, month + 1, 0);
+    endOfMonth.setHours(23, 59, 59, 999);
+
+    return { start: startOfMonth, end: endOfMonth };
+}
+
+// NEU: Verbesserter Datumsfilter mit korrekten Wochen und Monaten
+function filterByDate(event, filterType) {
+    if (filterType === 'all') return true;
+
+    const eventDate = new Date(event.start_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    switch(filterType) {
+        case 'today':
+            return eventDate.toDateString() === today.toDateString();
+
+        case 'tomorrow':
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return eventDate.toDateString() === tomorrow.toDateString();
+
+        case 'week': // Diese Woche (Mo-So)
+            const thisWeek = getWeekRange(0);
+            return eventDate >= thisWeek.start && eventDate <= thisWeek.end;
+
+        case 'next_week': // Nächste Woche (Mo-So)
+            const nextWeek = getWeekRange(1);
+            return eventDate >= nextWeek.start && eventDate <= nextWeek.end;
+
+        case 'this_month': // Dieser Monat (vom 1. bis letzten Tag)
+            const thisMonth = getMonthRange(0);
+            return eventDate >= thisMonth.start && eventDate <= thisMonth.end;
+
+        case 'next_month': // Nächster Monat (vom 1. bis letzten Tag)
+            const nextMonth = getMonthRange(1);
+            return eventDate >= nextMonth.start && eventDate <= nextMonth.end;
+
+        default:
+            return true;
+    }
 }
 
 // Filter anwenden
@@ -97,33 +278,6 @@ function applyFilters() {
     displayEvents(filteredEvents);
     addMarkersToMap(filteredEvents);
     updateResultsCount(filteredEvents.length);
-}
-
-// Datumsfilter
-function filterByDate(event, filterType) {
-    if (filterType === 'all') return true;
-
-    const eventDate = new Date(event.start_date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    switch(filterType) {
-        case 'today':
-            return eventDate.toDateString() === today.toDateString();
-        case 'tomorrow':
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            return eventDate.toDateString() === tomorrow.toDateString();
-        case 'week':
-            const endOfWeek = new Date(today);
-            endOfWeek.setDate(endOfWeek.getDate() + 7);
-            return eventDate >= today && eventDate <= endOfWeek;
-        case 'month':
-            const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-            return eventDate >= today && eventDate <= endOfMonth;
-        default:
-            return true;
-    }
 }
 
 // Kategoriefilter
@@ -147,8 +301,28 @@ function filterBySearch(event, searchTerm) {
     );
 }
 
-// Events anzeigen
-// Events anzeigen - ANGEPASST für Kategorie-Bilder
+// NEU: Verbesserte Datumsformatierung mit "Heute" und "Morgen"
+function formatEventDate(dateString) {
+    const eventDate = new Date(dateString);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    if (eventDate.toDateString() === today.toDateString()) {
+        return { dayString: 'Heute', month: '' };
+    } else if (eventDate.toDateString() === tomorrow.toDateString()) {
+        return { dayString: 'Morgen', month: '' };
+    } else {
+        return {
+            dayString: eventDate.getDate().toString(),
+            month: eventDate.toLocaleDateString('de-DE', { month: 'short' })
+        };
+    }
+}
+
+// Events anzeigen mit verbesserter Datumsanzeige
 function displayEvents(events) {
     const container = document.getElementById('events-container');
     if (!container) {
@@ -173,10 +347,10 @@ function displayEvents(events) {
         const endTime = formatTime(event.end_time);
         const categoryInfo = getCategoryInfo(event);
 
-        // NEU: Kategorie-Bild statt Event-Bild verwenden
-        const imageHtml = event.category_image ?
+        // Kategorie-Bild verwenden
+        const imageHtml = categoryInfo.image ?
             `<div class="image-container">
-                <img src="${event.category_image}" alt="${categoryInfo.name}" onerror="this.style.display='none'">
+                <img src="${categoryInfo.image}" alt="${categoryInfo.name}" onerror="this.style.display='none'">
             </div>` :
             '';
 
@@ -192,8 +366,8 @@ function displayEvents(events) {
             <div class="event-header">
                 <div class="date-title">
                     <div class="event-date">
-                        <div class="event-day">${dateInfo.day}.</div>
-                        <div class="event-month">${dateInfo.month}</div>
+                        <div class="event-day">${dateInfo.dayString}${dateInfo.month ? '.' : ''}</div>
+                        ${dateInfo.month ? `<div class="event-month">${dateInfo.month}</div>` : ''}
                     </div>
                     <div class="title-category">
                         <h3 class="event-title">${event.name}</h3>
@@ -215,28 +389,17 @@ function displayEvents(events) {
             </div>
         `;
 
-        // Klick-Event für Event in der Liste
+        // NEU: Verbessertes Klick-Event für Event in der Liste
         div.addEventListener('click', function() {
+            highlightEventOnMap(event.id);
             highlightEventInList(event.id);
-            highlightMarkerOnMap(event.id);
         });
 
         container.appendChild(div);
     });
 }
 
-// Neue Hilfsfunktion für Datumsformatierung
-function formatEventDate(dateString) {
-    const date = new Date(dateString);
-    return {
-        day: date.getDate().toString(),
-        month: date.toLocaleDateString('de-DE', { month: 'short' })
-    };
-}
-
-
 // Datum formatieren
-// Nur Datum formatieren (ohne Zeit)
 function formatDate(dateString) {
     const date = new Date(dateString);
     return date.toLocaleDateString('de-DE', {
@@ -245,9 +408,9 @@ function formatDate(dateString) {
         year: 'numeric'
     });
 }
+
 function formatTime(timeString) {
     if (!timeString) return '';
-    // TIME-Format (HH:MM:SS) zu lesbarer Zeit konvertieren
     const time = new Date(`2000-01-01T${timeString}`);
     return time.toLocaleTimeString('de-DE', {
         hour: '2-digit',
@@ -324,23 +487,13 @@ document.addEventListener('DOMContentLoaded', function() {
     loadEvents();
 });
 
-
-// Suchfilter - NUR nach Veranstaltungsnamen
-function filterBySearch(event, searchTerm) {
-    if (!searchTerm) return true;
-
-    const searchLower = searchTerm.toLowerCase();
-    return event.name.toLowerCase().includes(searchLower);
-}
-
-// Suchfunktion
+// Live-Suche
 const searchButton = document.getElementById('search-button');
 const searchInput = document.getElementById('search-input');
 
 if (searchButton && searchInput) {
     searchButton.addEventListener('click', performSearch);
     searchInput.addEventListener('input', function() {
-        // Live-Suche bei jeder Eingabe
         performSearch();
     });
     searchInput.addEventListener('keypress', function(e) {
@@ -348,59 +501,20 @@ if (searchButton && searchInput) {
     });
 }
 
-// Suche ausführen
-
-
 // Filter zurücksetzen
 const resetButton = document.getElementById('reset-filters');
 if (resetButton) {
     resetButton.addEventListener('click', function() {
+        const dateFilter = document.getElementById('date-filter');
+        const categoryFilter = document.getElementById('category-filter');
+        const searchInput = document.getElementById('search-input');
+
         if (dateFilter) dateFilter.value = 'all';
         if (categoryFilter) categoryFilter.value = 'all';
-        if (searchInput) searchInput.value = ''; // Suchfeld zurücksetzen
-
-        // Custom-Date-Container zurücksetzen
-        const customDateContainer = document.getElementById('custom-date-container');
-        if (customDateContainer) {
-            customDateContainer.style.display = 'none';
-        }
-        const startDate = document.getElementById('start-date');
-        const endDate = document.getElementById('end-date');
-        if (startDate) startDate.value = '';
-        if (endDate) endDate.value = '';
+        if (searchInput) searchInput.value = '';
 
         currentFilters = { date: 'all', category: 'all', search: '' };
         applyFilters();
-    });
-}
-
-
-// Marker zur Karte hinzufügen - ERWEITERT
-function addMarkersToMap(events) {
-    markerLayer.clearLayers();
-
-    events.forEach(event => {
-        if (event.latitude && event.longitude) {
-            const categoryInfo = getCategoryInfo(event);
-            const icon = createColoredIcon(categoryInfo.color);
-
-            const marker = L.marker([event.latitude, event.longitude], { icon: icon })
-                .addTo(markerLayer)
-                .bindPopup(`
-                    <div class="popup-content">
-                        <b>${event.name}</b><br>
-                        <span class="popup-category" style="color: ${categoryInfo.color}">
-                            ${categoryInfo.name}
-                        </span><br>
-                        <small>${formatDate(event.start_date)}</small><br>
-                        ${event.description || ''}
-                    </div>
-                `)
-                .on('click', function() {
-                    // Beim Klick auf Marker Event in der Liste hervorheben
-                    highlightEventInList(event.id);
-                });
-        }
     });
 }
 
@@ -412,19 +526,12 @@ function highlightEventInList(eventId) {
     // Alte Hervorhebungen entfernen
     Array.from(eventElements).forEach(eventElement => {
         eventElement.classList.remove('event-highlighted');
-        // Event-ID aus data-attribut entfernen falls vorhanden
-        eventElement.removeAttribute('data-event-id');
     });
 
     // Neues Event finden und hervorheben
     Array.from(eventElements).forEach(eventElement => {
-        // Prüfen ob dieses Element das gesuchte Event ist
-        const eventName = eventElement.querySelector('h3')?.textContent;
-        const targetEvent = allEvents.find(e => e.id == eventId);
-
-        if (targetEvent && eventName === targetEvent.name) {
-            // Event-ID speichern
-            eventElement.setAttribute('data-event-id', eventId);
+        const elementEventId = eventElement.getAttribute('data-event-id');
+        if (elementEventId == eventId) {
             eventElement.classList.add('event-highlighted');
 
             // Zum Event scrollen
@@ -432,6 +539,8 @@ function highlightEventInList(eventId) {
                 behavior: 'smooth',
                 block: 'center'
             });
+
+            // Hervorhebung nach 3 Sekunden entfernen
             setTimeout(() => {
                 eventElement.classList.remove('event-highlighted');
             }, 3000);
