@@ -9,6 +9,7 @@ $username = 'dbpbf05544796';
 $password = 'EventMap2024!Secure';
 $port = 4025;
 
+
 try {
     $pdo = new PDO("mysql:host=$host;port=$port;dbname=$dbname;charset=utf8", $username, $password, [
         PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
