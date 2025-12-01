@@ -215,7 +215,24 @@ h1{
     background-color: #f2fbf2;
     box-shadow: 0 4px 12px rgba(130, 148, 129, 0.7);
 }
+/* Header */
+header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    border-bottom: 1px solid black;
+    padding-bottom: 10px;
+    padding-top: 10px;
+}
 
+.login-link {
+    color: black;
+}
+
+.login-link:hover {
+    opacity: 0.7;
+}
+/* Footer */
 footer {
     text-align: center;
     margin-bottom: 30px;
@@ -229,4 +246,69 @@ footer {
 
 .social-icons a {
     color: black;
+}
+
+/* veranstalter-login.php */
+
+.login-wrapper {
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-card {
+    background: white;
+    border-radius: 10px;
+    border: 1px solid #829481;
+    padding: 20px 25px;
+    box-shadow: 0 8px 6px -6px rgba(0, 0, 0, 0.3);
+    max-width: 400px;
+    width: 100%;
+}
+
+.login-card p {
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.login-form label {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.login-form input {
+    padding: 8px 10px;
+    border-radius: 5px;
+    border: 1px solid #829481;
+    font-size: 14px;
+}
+
+.login-form input:focus {
+    outline: none;
+    border-color: #2c5530;
+    box-shadow: 0 0 0 2px rgba(130, 148, 129, 0.2);
+}
+
+.login-form button {
+    margin-top: 10px;
+    padding: 10px;
+    background: #829481;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.login-form button:hover {
+    background: #6d7a6d;
 }
