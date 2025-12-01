@@ -215,3 +215,18 @@ h1{
     background-color: #f2fbf2;
     box-shadow: 0 4px 12px rgba(130, 148, 129, 0.7);
 }
+
+footer {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.social-icons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.social-icons a {
+    color: black;
+}
