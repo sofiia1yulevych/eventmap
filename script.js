@@ -222,38 +222,57 @@ function getMonthRange(monthOffset = 0) {
     return { start: startOfMonth, end: endOfMonth };
 }
 
-// NEU: Verbesserter Datumsfilter mit korrekten Wochen und Monaten
+
 function filterByDate(event, filterType) {
     if (filterType === 'all') return true;
 
-    const eventDate = new Date(event.start_date);
+    const eventStartDate = new Date(event.start_date);
+    const eventEndDate = new Date(event.end_date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     switch(filterType) {
         case 'today':
-            return eventDate.toDateString() === today.toDateString();
+            // Event dauert heute an ODER startet heute ODER endet heute
+            return (today >= eventStartDate && today <= eventEndDate);
 
         case 'tomorrow':
             const tomorrow = new Date(today);
             tomorrow.setDate(tomorrow.getDate() + 1);
-            return eventDate.toDateString() === tomorrow.toDateString();
+            // Event dauert morgen an
+            return (tomorrow >= eventStartDate && tomorrow <= eventEndDate);
 
         case 'week': // Diese Woche (Mo-So)
             const thisWeek = getWeekRange(0);
-            return eventDate >= thisWeek.start && eventDate <= thisWeek.end;
+            // Event überschneidet sich mit dieser Woche
+            return (
+                (eventStartDate <= thisWeek.end && eventEndDate >= thisWeek.start) ||
+                (eventStartDate >= thisWeek.start && eventStartDate <= thisWeek.end)
+            );
 
         case 'next_week': // Nächste Woche (Mo-So)
             const nextWeek = getWeekRange(1);
-            return eventDate >= nextWeek.start && eventDate <= nextWeek.end;
+            // Event überschneidet sich mit nächster Woche
+            return (
+                (eventStartDate <= nextWeek.end && eventEndDate >= nextWeek.start) ||
+                (eventStartDate >= nextWeek.start && eventStartDate <= nextWeek.end)
+            );
 
-        case 'this_month': // Dieser Monat (vom 1. bis letzten Tag)
+        case 'month': // Dieser Monat (vom 1. bis letzten Tag)
             const thisMonth = getMonthRange(0);
-            return eventDate >= thisMonth.start && eventDate <= thisMonth.end;
+            // Event überschneidet sich mit diesem Monat
+            return (
+                (eventStartDate <= thisMonth.end && eventEndDate >= thisMonth.start) ||
+                (eventStartDate >= thisMonth.start && eventStartDate <= thisMonth.end)
+            );
 
-        case 'next_month': // Nächster Monat (vom 1. bis letzten Tag)
+        case 'next_month': // Nächster Monat
             const nextMonth = getMonthRange(1);
-            return eventDate >= nextMonth.start && eventDate <= nextMonth.end;
+            // Event überschneidet sich mit nächstem Monat
+            return (
+                (eventStartDate <= nextMonth.end && eventEndDate >= nextMonth.start) ||
+                (eventStartDate >= nextMonth.start && eventStartDate <= nextMonth.end)
+            );
 
         default:
             return true;
@@ -301,28 +320,70 @@ function filterBySearch(event, searchTerm) {
     );
 }
 
-// NEU: Verbesserte Datumsformatierung mit "Heute" und "Morgen"
-function formatEventDate(dateString) {
-    const eventDate = new Date(dateString);
+function formatEventDate(event) {
+    const startDate = new Date(event.start_date);
+    const endDate = new Date(event.end_date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    if (eventDate.toDateString() === today.toDateString()) {
-        return { dayString: 'Heute', month: '' };
-    } else if (eventDate.toDateString() === tomorrow.toDateString()) {
-        return { dayString: 'Morgen', month: '' };
-    } else {
-        return {
-            dayString: eventDate.getDate().toString(),
-            month: eventDate.toLocaleDateString('de-DE', { month: 'short' })
-        };
+    // Wenn Event nur einen Tag dauert
+    if (event.start_date === event.end_date) {
+        if (startDate.toDateString() === today.toDateString()) {
+            return { dayString: 'Heute', month: '', isMultiDay: false };
+        } else if (startDate.toDateString() === tomorrow.toDateString()) {
+            return { dayString: 'Morgen', month: '', isMultiDay: false };
+        } else {
+            return {
+                dayString: startDate.getDate().toString(),
+                month: startDate.toLocaleDateString('de-DE', { month: 'short' }),
+                isMultiDay: false
+            };
+        }
+    }
+    // Wenn Event mehrere Tage dauert
+    else {
+        // Prüfe, ob das Event heute läuft
+        if (today >= startDate && today <= endDate) {
+            return {
+                dayString: 'Jetzt',
+                month: '',
+                isMultiDay: true,
+                fullDate: `${startDate.getDate()}.${startDate.getMonth()+1}. - ${endDate.getDate()}.${endDate.getMonth()+1}.`
+            };
+        }
+        // Prüfe, ob das Event morgen läuft
+        else if (tomorrow >= startDate && tomorrow <= endDate) {
+            return {
+                dayString: 'Morgen',
+                month: '',
+                isMultiDay: true,
+                fullDate: `${startDate.getDate()}.${startDate.getMonth()+1}. - ${endDate.getDate()}.${endDate.getMonth()+1}.`
+            };
+        }
+        // Event startet in der Zukunft
+        else if (startDate > today) {
+            return {
+                dayString: startDate.getDate().toString(),
+                month: startDate.toLocaleDateString('de-DE', { month: 'short' }),
+                isMultiDay: true,
+                fullDate: `${startDate.getDate()}.${startDate.getMonth()+1}. - ${endDate.getDate()}.${endDate.getMonth()+1}.`
+            };
+        }
+        // Event läuft bereits
+        else {
+            return {
+                dayString: 'Jetzt',
+                month: '',
+                isMultiDay: true,
+                fullDate: `${startDate.getDate()}.${startDate.getMonth()+1}. - ${endDate.getDate()}.${endDate.getMonth()+1}.`
+            };
+        }
     }
 }
 
-// Events anzeigen mit verbesserter Datumsanzeige
 function displayEvents(events) {
     const container = document.getElementById('events-container');
     if (!container) {
@@ -342,7 +403,7 @@ function displayEvents(events) {
         div.className = "event";
         div.setAttribute('data-event-id', event.id);
 
-        const dateInfo = formatEventDate(event.start_date);
+        const dateInfo = formatEventDate(event);
         const startTime = formatTime(event.start_time);
         const endTime = formatTime(event.end_time);
         const categoryInfo = getCategoryInfo(event);
@@ -362,13 +423,29 @@ function displayEvents(events) {
             timeInfo = `<p class="event-time">🕑 ${startTime} Uhr</p>`;
         }
 
+        // Datumsanzeige für mehr-tägige Events
+        let dateDisplay = '';
+        if (dateInfo.isMultiDay) {
+            dateDisplay = `
+                <div class="event-date multi-day">
+                    <div class="event-day">${dateInfo.dayString}</div>
+                    ${dateInfo.month ? `<div class="event-month">${dateInfo.month}</div>` : ''}
+                    <div class="event-duration">${dateInfo.fullDate}</div>
+                </div>
+            `;
+        } else {
+            dateDisplay = `
+                <div class="event-date">
+                    <div class="event-day">${dateInfo.dayString}${dateInfo.month ? '.' : ''}</div>
+                    ${dateInfo.month ? `<div class="event-month">${dateInfo.month}</div>` : ''}
+                </div>
+            `;
+        }
+
         div.innerHTML = `
             <div class="event-header">
                 <div class="date-title">
-                    <div class="event-date">
-                        <div class="event-day">${dateInfo.dayString}${dateInfo.month ? '.' : ''}</div>
-                        ${dateInfo.month ? `<div class="event-month">${dateInfo.month}</div>` : ''}
-                    </div>
+                    ${dateDisplay}
                     <div class="title-category">
                         <h3 class="event-title">${event.name}</h3>
                         <div class="event-category">
@@ -389,7 +466,7 @@ function displayEvents(events) {
             </div>
         `;
 
-        // NEU: Verbessertes Klick-Event für Event in der Liste
+        // Klick-Event für Event in der Liste
         div.addEventListener('click', function() {
             highlightEventOnMap(event.id);
             highlightEventInList(event.id);
